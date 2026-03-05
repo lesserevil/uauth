@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -36,6 +38,7 @@ func (tm *tunnelManager) establish(port int) {
 
 	cmd := exec.Command("ssh",
 		"-N",                  // no remote command
+		"-v",                  // debug output so we can detect when forward is ready
 		"-o", "BatchMode=yes", // never prompt for password/passphrase
 		"-o", "ExitOnForwardFailure=yes",
 		"-o", "StrictHostKeyChecking=accept-new",
@@ -43,24 +46,37 @@ func (tm *tunnelManager) establish(port int) {
 		target,
 	)
 
-	// Suppress tunnel output so it doesn't pollute the wrapped command's terminal.
-	devnull, err := os.Open(os.DevNull)
-	if err == nil {
+	// Suppress stdout; pipe stderr so we can detect tunnel readiness.
+	devnull, _ := os.Open(os.DevNull)
+	if devnull != nil {
 		cmd.Stdout = devnull
-		cmd.Stderr = devnull
 		defer devnull.Close()
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		// Fall back to suppressing stderr entirely.
+		cmd.Stderr = devnull
+		stderrPipe = nil
 	}
 
 	if err := cmd.Start(); err != nil {
-		logVerbose("Failed to establish tunnel for port %d: %v", port, err)
+		logVerbose("Failed to start tunnel for port %d: %v", port, err)
 		return
 	}
 
 	tm.tunnels[port] = cmd
-	logVerbose("Tunnel established: localhost:%d -> %s:%d", port, tm.clientIP, port)
+	logVerbose("Tunnel connecting: localhost:%d -> %s:%d", port, tm.clientIP, port)
 
-	// Monitor tunnel process in background
+	// Monitor tunnel process in background; log when the forward is confirmed ready.
 	go func() {
+		if stderrPipe != nil {
+			scanner := bufio.NewScanner(stderrPipe)
+			for scanner.Scan() {
+				if strings.Contains(scanner.Text(), "remote forward success") {
+					logVerbose("Tunnel ready: localhost:%d -> %s:%d", port, tm.clientIP, port)
+				}
+			}
+		}
 		err := cmd.Wait()
 		tm.mu.Lock()
 		delete(tm.tunnels, port)

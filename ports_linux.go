@@ -112,7 +112,9 @@ func parseProcNetTCP(path string, inodePorts map[uint64]int) error {
 	return scanner.Err()
 }
 
-// isLocalhost checks if a hex-encoded IP is 127.0.0.1 or ::1.
+// isLocalhost checks if a hex-encoded IP is localhost or a wildcard (0.0.0.0 / ::).
+// Wildcard bindings are included because a locally-bound wildcard port is still
+// reachable only through the local tunnel.
 func isLocalhost(hexIP string) bool {
 	switch len(hexIP) {
 	case 8: // IPv4
@@ -122,7 +124,7 @@ func isLocalhost(hexIP string) bool {
 		}
 		// /proc/net/tcp uses little-endian
 		ip := net.IPv4(b[3], b[2], b[1], b[0])
-		return ip.IsLoopback()
+		return ip.IsLoopback() || ip.Equal(net.IPv4zero)
 	case 32: // IPv6
 		b, err := hex.DecodeString(hexIP)
 		if err != nil || len(b) != 16 {
@@ -136,7 +138,7 @@ func isLocalhost(hexIP string) bool {
 			ip[i*4+2] = b[i*4+1]
 			ip[i*4+3] = b[i*4+0]
 		}
-		return net.IP(ip[:]).IsLoopback()
+		return net.IP(ip[:]).IsLoopback() || net.IP(ip[:]).Equal(net.IPv6unspecified)
 	}
 	return false
 }

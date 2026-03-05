@@ -14,12 +14,14 @@ var (
 	sshUser      string
 	pollInterval time.Duration
 	verbose      bool
+	fileLogger   *log.Logger
 )
 
 func main() {
 	flag.StringVar(&sshUser, "ssh-user", os.Getenv("USER"), "Username for reverse SSH connection")
 	pollMs := flag.Int("poll-interval", 500, "Port scan interval in milliseconds")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	logFile := flag.String("log-file", "", "Path to log file for tunnel events")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: uauth [flags] -- <command> [args...]\n\nFlags:\n")
@@ -28,6 +30,15 @@ func main() {
 
 	flag.Parse()
 	pollInterval = time.Duration(*pollMs) * time.Millisecond
+
+	if *logFile != "" {
+		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalf("Failed to open log file: %v", err)
+		}
+		defer f.Close()
+		fileLogger = log.New(f, "", log.LstdFlags)
+	}
 
 	args := flag.Args()
 	if len(args) == 0 {
@@ -114,5 +125,8 @@ func main() {
 func logVerbose(format string, args ...any) {
 	if verbose {
 		log.Printf(format, args...)
+	}
+	if fileLogger != nil {
+		fileLogger.Printf(format, args...)
 	}
 }
