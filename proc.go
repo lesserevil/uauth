@@ -13,12 +13,20 @@ type childProcess struct {
 }
 
 // startChild launches the command in its own process group.
+// If stdin is a terminal, the child becomes the foreground process group
+// so it has full terminal control (raw mode, signals, window resize, etc.).
 func startChild(args []string) (*childProcess, error) {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	attr := &syscall.SysProcAttr{Setpgid: true}
+	if fi, err := os.Stdin.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
+		attr.Foreground = true
+		attr.Ctty = int(os.Stdin.Fd())
+	}
+	cmd.SysProcAttr = attr
 
 	if err := cmd.Start(); err != nil {
 		return nil, err

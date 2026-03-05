@@ -52,9 +52,10 @@ func main() {
 		log.Fatalf("Failed to start child process: %v", err)
 	}
 
-	// Set up signal forwarding
+	// Forward SIGTERM to child for cleanup (SIGINT goes directly to
+	// child's foreground process group from the terminal).
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigCh, syscall.SIGTERM)
 
 	// Track tunnels
 	tm := newTunnelManager(sshUser, clientIP)
@@ -93,7 +94,7 @@ func main() {
 				currentPorts[p] = true
 				if !knownPorts[p] {
 					knownPorts[p] = true
-					log.Printf("New listener detected on port %d, establishing tunnel", p)
+					logVerbose("New listener detected on port %d, establishing tunnel", p)
 					tm.establish(p)
 				}
 			}
@@ -102,7 +103,7 @@ func main() {
 			for p := range knownPorts {
 				if !currentPorts[p] {
 					delete(knownPorts, p)
-					log.Printf("Port %d no longer listening, tearing down tunnel", p)
+					logVerbose("Port %d no longer listening, tearing down tunnel", p)
 					tm.teardown(p)
 				}
 			}

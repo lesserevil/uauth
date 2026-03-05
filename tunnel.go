@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"os/exec"
 	"sync"
 )
@@ -43,8 +43,16 @@ func (tm *tunnelManager) establish(port int) {
 		target,
 	)
 
+	// Suppress tunnel output so it doesn't pollute the wrapped command's terminal.
+	devnull, err := os.Open(os.DevNull)
+	if err == nil {
+		cmd.Stdout = devnull
+		cmd.Stderr = devnull
+		defer devnull.Close()
+	}
+
 	if err := cmd.Start(); err != nil {
-		log.Printf("WARNING: Failed to establish tunnel for port %d: %v", port, err)
+		logVerbose("Failed to establish tunnel for port %d: %v", port, err)
 		return
 	}
 
