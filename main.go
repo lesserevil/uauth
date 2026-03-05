@@ -43,11 +43,6 @@ func main() {
 		// execPassthrough doesn't return
 	}
 
-	authSock := os.Getenv("SSH_AUTH_SOCK")
-	if authSock == "" {
-		log.Println("WARNING: SSH_AUTH_SOCK not set — reverse tunnels may fail to authenticate")
-	}
-
 	logVerbose("SSH session detected, client IP: %s", clientIP)
 	logVerbose("Reverse SSH user: %s", sshUser)
 

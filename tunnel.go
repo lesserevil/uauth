@@ -36,6 +36,7 @@ func (tm *tunnelManager) establish(port int) {
 
 	cmd := exec.Command("ssh",
 		"-N",                  // no remote command
+		"-o", "BatchMode=yes", // never prompt for password/passphrase
 		"-o", "ExitOnForwardFailure=yes",
 		"-o", "StrictHostKeyChecking=accept-new",
 		"-R", remote,
