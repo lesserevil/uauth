@@ -20,6 +20,7 @@ func startChild(args []string) (*childProcess, error) {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), "BROWSER=false")
 
 	attr := &syscall.SysProcAttr{Setpgid: true}
 	if fi, err := os.Stdin.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
