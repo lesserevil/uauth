@@ -20,7 +20,7 @@ func startChild(args []string) (*childProcess, error) {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = append(os.Environ(), "BROWSER=false")
+	cmd.Env = append(filterEnv(os.Environ(), "DISPLAY", "BROWSER"), "BROWSER=false")
 
 	attr := &syscall.SysProcAttr{Setpgid: true}
 	if fi, err := os.Stdin.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
@@ -74,6 +74,24 @@ func execPassthrough(args []string) {
 	if err != nil {
 		log_fatal("exec failed: %v", err)
 	}
+}
+
+// filterEnv returns env with any entry whose key matches one of the given keys removed.
+func filterEnv(env []string, keys ...string) []string {
+	out := env[:0:len(env)]
+	for _, e := range env {
+		skip := false
+		for _, k := range keys {
+			if len(e) >= len(k)+1 && e[:len(k)] == k && e[len(k)] == '=' {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func log_fatal(format string, args ...any) {

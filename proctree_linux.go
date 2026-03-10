@@ -8,14 +8,17 @@ import (
 	"strings"
 )
 
-// processTreePIDs returns all PIDs in the process group (pgid).
-func processTreePIDs(pgid int) ([]int, error) {
+// processTreePIDs returns all PIDs descended from rootPID (inclusive),
+// walking the full parent-child tree so processes that create new process
+// groups (e.g. MCP servers) are still included.
+func processTreePIDs(rootPID int) ([]int, error) {
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
 		return nil, err
 	}
 
-	var pids []int
+	// Build ppid→children map
+	children := make(map[int][]int)
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -36,17 +39,28 @@ func processTreePIDs(pgid int) ([]int, error) {
 			continue
 		}
 		fields := strings.Fields(s[idx+2:])
-		if len(fields) < 3 {
+		if len(fields) < 1 {
 			continue
 		}
-		// fields[2] is pgrp (0-indexed from after state)
-		pgrp, err := strconv.Atoi(fields[2])
+		// fields[0] is state, fields[1] is ppid
+		if len(fields) < 2 {
+			continue
+		}
+		ppid, err := strconv.Atoi(fields[1])
 		if err != nil {
 			continue
 		}
-		if pgrp == pgid {
-			pids = append(pids, pid)
-		}
+		children[ppid] = append(children[ppid], pid)
+	}
+
+	// BFS from root
+	var pids []int
+	queue := []int{rootPID}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		pids = append(pids, current)
+		queue = append(queue, children[current]...)
 	}
 
 	return pids, nil

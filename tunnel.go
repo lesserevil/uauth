@@ -33,7 +33,7 @@ func (tm *tunnelManager) establish(port int) {
 		return
 	}
 
-	remote := fmt.Sprintf("%d:localhost:%d", port, port)
+	remote := fmt.Sprintf("localhost:%d:localhost:%d", port, port)
 	target := fmt.Sprintf("%s@%s", tm.user, tm.clientIP)
 
 	cmd := exec.Command("ssh",
@@ -72,7 +72,9 @@ func (tm *tunnelManager) establish(port int) {
 		if stderrPipe != nil {
 			scanner := bufio.NewScanner(stderrPipe)
 			for scanner.Scan() {
-				if strings.Contains(scanner.Text(), "remote forward success") {
+				line := scanner.Text()
+				logVerbose("ssh[%d]: %s", port, line)
+				if strings.Contains(line, "remote forward success") {
 					logVerbose("Tunnel ready: localhost:%d -> %s:%d", port, tm.clientIP, port)
 				}
 			}
